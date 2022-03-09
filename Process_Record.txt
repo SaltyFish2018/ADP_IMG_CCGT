@@ -1,0 +1,177 @@
+1013_original_result: 
+Optimize a model with 2874 rows, 3072 columns and 12641 nonzeros
+Model fingerprint: 0x32d8ffd6
+Model has 192 quadratic constraints
+Variable types: 2880 continuous, 192 integer (192 binary)
+Coefficient statistics:
+  Matrix range     [2e-01, 1e+02]
+  QMatrix range    [2e-01, 1e+00]
+  QLMatrix range   [2e-01, 2e+01]
+  Objective range  [3e-01, 4e+02]
+  Bounds range     [4e-01, 1e+03]
+  RHS range        [1e+00, 7e+01]
+  QRHS range       [8e+00, 4e+01]
+Presolve removed 659 rows and 288 columns
+Presolve time: 0.03s
+Presolved: 2983 rows, 2976 columns, 14106 nonzeros
+Variable types: 2784 continuous, 192 integer (192 binary)
+
+Root relaxation: objective 1.018260e+05, 2168 iterations, 0.07 seconds
+
+    Nodes    |    Current Node    |     Objective Bounds      |     Work
+ Expl Unexpl |  Obj  Depth IntInf | Incumbent    BestBd   Gap | It/Node Time
+
+     0     0 101826.037    0   38          - 101826.037      -     -    0s
+H    0     0                    101889.26235 101826.037  0.06%     -    0s
+H    0     0                    101856.32164 101826.037  0.03%     -    0s
+     0     0 101841.213    0   38 101856.322 101841.213  0.01%     -    0s
+     0     0 101841.510    0   32 101856.322 101841.510  0.01%     -    0s
+H    0     0                    101851.16458 101841.510  0.01%     -    0s
+     0     0 101841.535    0   30 101851.165 101841.535  0.01%     -    0s
+
+Cutting planes:
+  Gomory: 7
+  MIR: 13
+  Flow cover: 18
+  RLT: 11
+  Relax-and-lift: 2
+
+Explored 1 nodes (2284 simplex iterations) in 0.31 seconds
+Thread count was 6 (of 6 available processors)
+
+Solution count 3: 101851 101856 101889 
+
+Optimal solution found (tolerance 1.00e-04)
+Best objective 1.018511645830e+05, best bound 1.018415353545e+05, gap 0.0095%
+
+1、针对热负荷削减过多的问题——怀疑是CCGT单输入及与电网的交易限制了CCGT产热，于是调大了与P_GRID lb的绝对值（-20），负荷削减量总体减少，但仍然存在问题。
+2、燃气锅炉一直保持最低产热功率——即宁可削减热负荷也不让燃气锅炉去产热，说明削减的惩罚系数还不够大，但是过大问题无法求解，从150试到350。问题得到解决。
+3、考虑到与电网的交易量偏大，CCGT拉满就为了多给电网售电
+
+TODO：
+1、把Electric_Demand整体调大20MW。 √
+2、最低可把Q_CCGT初始产热起点设为26，若不设置初始值则会默认从50开始，热电状态不对应。 √ ？
+3、因为有与外电网交易行为，会优先考虑向电网售电。因此自然出现了“以电定热”的生产模式。 ×
+     让CCGT机组尽可能多地发电（达到上限值），热部分因为受到输入及动态方程的约束达到热功率峰值后无法继续参与调峰，于是产生了与热负荷趋势一致的热负荷削减。
+     
+1015
+TODO：
+1、修改heat demand曲线为Q_delete。√
+2、写myopic policy。
+
+1017
+1、保存经过调参后的结果。
+Optimize a model with 2878 rows, 3072 columns and 12645 nonzeros
+Model fingerprint: 0xf33a9577
+Model has 192 quadratic constraints
+Variable types: 2880 continuous, 192 integer (192 binary)
+Coefficient statistics:
+  Matrix range     [2e-01, 1e+02]
+  QMatrix range    [2e-01, 1e+00]
+  QLMatrix range   [2e-01, 2e+01]
+  Objective range  [3e-01, 4e+02]
+  Bounds range     [4e-01, 1e+03]
+  RHS range        [1e+00, 6e+01]
+  QRHS range       [8e+00, 6e+01]
+Presolve removed 586 rows and 228 columns
+Presolve time: 0.01s
+Presolved: 3060 rows, 3036 columns, 14298 nonzeros
+Variable types: 2844 continuous, 192 integer (192 binary)
+
+Root relaxation: objective 1.084820e+05, 1960 iterations, 0.04 seconds
+
+    Nodes    |    Current Node    |     Objective Bounds      |     Work
+ Expl Unexpl |  Obj  Depth IntInf | Incumbent    BestBd   Gap | It/Node Time
+
+*    0     0               0    108481.96335 108481.963  0.00%     -    0s
+
+Explored 0 nodes (1960 simplex iterations) in 0.07 seconds
+Thread count was 6 (of 6 available processors)
+
+Solution count 1: 108482 
+
+Optimal solution found (tolerance 1.00e-04)
+Best objective 1.084819633501e+05, best bound 1.084819633501e+05, gap 0.0000%
+
+
+1018
+发现一个严重的错误，MILP问题将与电网的交易成本也作为约束变量写入了约束条件中，对结果有明显的影响。why？
+修正后，重新将与电网的交易约束上下限调成±6。
+在之前调参的基础上，将电负荷调整为“E_plus”——
+电力生产部分因为有SOC、GRID作为支撑，约束较容易满足。热力生产部分只有一个Q_cur作为放松变量，因此ccgt的生产很明显在跟着热负荷趋势变化。
+因此，当出现了当电力负荷增长但热负荷下降的情况（60-75），ccgt的发电量下降，电网侧调用SOC与电网交易等手段尽量满足电负荷。
+当热部分因为受到输入约束及动态方程的约束达到热功率峰值后无法继续参与调峰，会调度GB发热，当两者都到达上限值时，产生了与热负荷趋势一致的热负荷削减。
+
+保存结果：
+Optimize a model with 2782 rows, 2976 columns and 12453 nonzeros
+Model fingerprint: 0x25311a52
+Model has 192 quadratic constraints
+Variable types: 2784 continuous, 192 integer (192 binary)
+Coefficient statistics:
+  Matrix range     [2e-01, 3e+00]
+  QMatrix range    [2e-01, 1e+00]
+  QLMatrix range   [2e-01, 2e+01]
+  Objective range  [2e+01, 2e+03]
+  Bounds range     [4e-01, 5e+01]
+  RHS range        [1e+00, 6e+01]
+  QRHS range       [8e+00, 5e+01]
+Presolve removed 490 rows and 132 columns
+Presolve time: 0.01s
+Presolved: 3060 rows, 3036 columns, 14298 nonzeros
+Variable types: 2844 continuous, 192 integer (192 binary)
+
+Root relaxation: objective 9.374482e+04, 2033 iterations, 0.05 seconds
+
+    Nodes    |    Current Node    |     Objective Bounds      |     Work
+ Expl Unexpl |  Obj  Depth IntInf | Incumbent    BestBd   Gap | It/Node Time
+
+*    0     0               0    93744.823205 93744.8232  0.00%     -    0s
+
+Explored 0 nodes (2109 simplex iterations) in 0.09 seconds
+Thread count was 6 (of 6 available processors)
+
+Solution count 1: 93744.8 
+
+Optimal solution found (tolerance 1.00e-04)
+Best objective 9.374482320458e+04, best bound 9.374482320458e+04, gap 0.0000%
+93744.82320457892
+
+TODO：
+1、和师兄确认一下机组工作范围
+2、继续调myopic
+3、和老师讨论一下结果
+4、准备开始adp
+
+1019
+讨论后，确定了综合能源微网对象作为大电网其中一个节点，可利用简化的直流潮流模型（即不考虑无功功率、幅频相角等）。
+考虑到热部分的热惯性及时滞现象，大时标下，每个时刻的决策满足实时的电负荷需求及未来15min的热负荷需求。
+
+1020
+重新看一下Q_CCGT的四阶热约束方程 √
+初始值问题需要继续探究，尝试将爬坡约束加到小时标变量中。√ 解决了小时标前四个的解波动过大的问题。
+依据Q_CCGT的四阶约束方程推断的稳态效率转化系数（K=15.12），设定Q_CCGT的上下限（15,50），以此修改了g_CCGT的上下限范围（0.9918,3.3060）及P_CCGT的静态效率转化模型。
+完成了myopic policy的单步贪婪求解。相同约束条件、电热负荷条件下，MILP：93330.73050738493，用时0.13 seconds； Myopic：110858.4078
+
+1021
+利用matplotlib画出myopic policy的堆积柱形图。
+开始MPC
+
+1024
+MPC：110772.15187707476
+保存相关结果，开始ADP
+
+11.9
+引入状态变量的myopic：110997
+但Q_CCGT的输出存在毛刺，待解决。状态空间转换导致的不连续点？
+解决，是存储过程的dataframe格式不对，默认将过程变量取整保存。修改后获得引入状态变量的myopic：110852.23674107603
+
+12.10
+修改后获得引入状态变量的MILP：93319.23997420419
+不考虑Q_CCGT动态状态转移过程的MILP：93278.38400291302（Q_CCGT[interval] == 15.124 * g_CCGT[interval]）
+
+12.13
+不考虑Q_CCGT动态状态转移过程，用固定热电比CCGT稳态模型的MILP：95750.78728484208（Q_CCGT[interval] == 18.64 * g_CCGT[interval] - 11.65），该结果差于考虑动态过程的MILP
+原因：忽略了热惯性带来的潜在热储能，稳态过程中的Q_CCGT出力下降速度过快/上升速度偏慢。
+
+1.13
+MPC 110481.2810954314

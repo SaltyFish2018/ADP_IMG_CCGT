@@ -1,0 +1,2 @@
+
+1、strategy.addVar默认变量lb=0
