@@ -1,5 +1,5 @@
 ## About
-This repo is an official code of ADP-based economic dispatch for CCGT-Integrated microgrid.
+This repo is an official code of ADP-based economic dispatch for integrated microgrid with the CCGT thermodynamic process.
 
 ### Publication
 If you use the code in an academic work, or inspired by our method, please consider citing the following:
@@ -12,7 +12,7 @@ If you use the code in an academic work, or inspired by our method, please consi
 		status={Under Review}
 	}
 
-or the pre
+or the previous conference paper
 
 	@inproceedings{lin2021economic,
 		title={Economic Dispatch of an Integrated Microgrid Based on the Dynamic Process of CCGT Plant},
